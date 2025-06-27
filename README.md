@@ -22,11 +22,17 @@ Um plugin minimalista para Neovim que traz a experiência do Cursor IDE com inte
 export ANTHROPIC_API_KEY="sua-chave-anthropic-aqui"
 ```
 
+
+```bash
+# Adicione no seu profile do power shell (Windows)
+$env:ANTHROPIC_API_KEY="sua-chave-anthropic-aqui"
+```
+
 ### Lazy.nvim
 
 ```lua
 {
-  "seu-usuario/nano-pilot",
+  "estevaofon/nano-pilot",
   config = function()
     require("nano-pilot").setup({
       -- A API key será lida automaticamente da variável de ambiente
