@@ -1,104 +1,75 @@
-# 🚀 Nano Pilot
+# 🚀 ailite.nvim
 
-Um plugin minimalista para Neovim que traz a experiência do Cursor IDE com integração completa da API do Claude, aplicação automática de código e interface conversacional intuitiva.
+A lightweight, interactive AI coding assistant for Neovim with Claude API integration. Experience a terminal-style chat interface directly in your editor with seamless code application capabilities.
 
-## ✨ Características
+![Neovim](https://img.shields.io/badge/Neovim-0.8+-green.svg)
+![Lua](https://img.shields.io/badge/Lua-5.1+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-- 💬 **Chat integrado**: Interface flutuante elegante para conversas com Claude
-- 🔧 **Aplicação automática de código**: Aplique código diretamente nos seus arquivos
-- 📁 **Contexto inteligente**: Inclua múltiplos arquivos para contexto completo
-- 🎯 **Preview com diff**: Visualize mudanças antes de aplicar
-- ⚡ **Navegação entre blocos**: Navegue facilmente entre múltiplos blocos de código
-- 🎨 **Interface moderna**: Design limpo com bordas arredondadas e syntax highlighting
-- 📚 **Histórico persistente**: Mantém contexto completo da conversa
-- ⌨️ **Atalhos intuitivos**: Teclas de atalho bem pensadas para fluxo eficiente
+## ✨ Features
 
-## 📦 Instalação
+- **Interactive Terminal-Style Chat**: Type directly in the chat buffer, no popup windows
+- **Claude API Integration**: Powered by Anthropic's Claude AI models
+- **Smart Code Management**: Extract, preview, and apply code blocks with multiple options
+- **File Context**: Include multiple files in your conversation context
+- **Syntax Highlighting**: Native Neovim highlighting for code blocks in chat
+- **Visual Selection Support**: Send selected code snippets with context
+- **Diff Preview**: Review changes before applying code modifications
+- **Persistent History**: Maintain conversation context across prompts
 
-### 🔑 Primeiro: Configure sua API Key
+## 📦 Installation
 
-```bash
-# Adicione ao seu ~/.bashrc, ~/.zshrc ou equivalente
-export ANTHROPIC_API_KEY="sua-chave-anthropic-aqui"
-```
-
-
-```bash
-# Adicione no seu profile do power shell (Windows)
-$env:ANTHROPIC_API_KEY="sua-chave-anthropic-aqui"
-```
-
-### Lazy.nvim
+### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
-  "estevaofon/nano-pilot",
+  "your-username/ailite.nvim",
+  dependencies = {
+    "nvim-telescope/telescope.nvim", -- Optional, for file selection
+  },
   config = function()
-    require("nano-pilot").setup({
-      -- A API key será lida automaticamente da variável de ambiente
+    require("ailite").setup({
+      api_key = "your-claude-api-key", -- Or use environment variable
+      -- Additional configuration options
     })
   end,
-  dependencies = {
-    "nvim-telescope/telescope.nvim", -- opcional, para seleção de arquivos
-  },
 }
 ```
 
-### Packer
+### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
 
 ```lua
 use {
-  "seu-usuario/nano-pilot",
+  "your-username/ailite.nvim",
+  requires = {
+    "nvim-telescope/telescope.nvim", -- Optional
+  },
   config = function()
-    require("nano-pilot").setup({
-      -- A API key será lida automaticamente da variável de ambiente
+    require("ailite").setup({
+      api_key = "your-claude-api-key",
     })
-  end
+  end,
 }
 ```
 
-### Vim-Plug
+## 🔧 Configuration
 
-```vim
-Plug 'seu-usuario/nano-pilot'
-
-lua << EOF
-require("nano-pilot").setup({
-  -- A API key será lida automaticamente da variável de ambiente
-})
-EOF
-```
-
-## 🔧 Configuração
-
-### Configuração Básica
+### Setup
 
 ```lua
-require("nano-pilot").setup({
-  -- A API key será lida automaticamente da variável de ambiente ANTHROPIC_API_KEY
-  -- Nenhuma configuração adicional é necessária para uso básico
-})
-```
-
-### Configuração Avançada
-
-```lua
-require("nano-pilot").setup({
+require("ailite").setup({
   -- API Configuration
-  -- api_key é lida automaticamente de ANTHROPIC_API_KEY
-  -- Se necessário, pode ser sobrescrita:
-  -- api_key = "sua-chave-personalizada",
-  
+  api_key = nil, -- Will check ANTHROPIC_API_KEY or CLAUDE_API_KEY env vars
   model = "claude-3-5-sonnet-20241022",
   max_tokens = 8192,
   temperature = 0.7,
-  history_limit = 20, -- número de mensagens para manter no contexto
   
-  -- UI Configuration
+  -- Chat Configuration
+  history_limit = 20,
   chat_window = {
     width = 100,
     height = 35,
-    border = "rounded", -- none, single, double, rounded, solid, shadow
+    border = "rounded",
   },
   code_window = {
     width = 80,
@@ -106,208 +77,161 @@ require("nano-pilot").setup({
     border = "rounded",
   },
   
-  -- Keymaps (dentro das janelas do plugin)
+  -- Interface Configuration
+  chat_input_prefix = ">>> ",
+  assistant_prefix = "Claude: ",
+  user_prefix = "You: ",
+  
+  -- Keybindings
   keymaps = {
-    apply_code = "<C-a>",
-    copy_code = "<C-c>",
-    next_code_block = "<C-n>",
-    prev_code_block = "<C-p>",
-    toggle_diff = "<C-d>",
+    send_message = "<C-s>",     -- Send message in insert mode
+    apply_code = "<C-a>",       -- Apply code in preview
+    copy_code = "<C-c>",        -- Copy code to clipboard
+    next_code_block = "<C-n>",  -- Navigate to next code block
+    prev_code_block = "<C-p>",  -- Navigate to previous code block
   },
 })
 ```
 
-## ⌨️ Atalhos
+### Environment Variables
 
-### Atalhos Globais (padrão)
+Set your API key via environment variable:
 
-| Atalho | Modo | Ação |
-|--------|------|------|
-| `<leader>cc` | Normal | Abrir/fechar chat |
-| `<leader>cp` | Normal | Prompt rápido |
-| `<leader>cp` | Visual | Prompt com seleção |
-| `<leader>cf` | Normal | Selecionar arquivos para contexto |
-| `<leader>cl` | Normal | Listar arquivos selecionados |
-| `<leader>ct` | Normal | Toggle arquivo atual no contexto |
-| `<leader>ca` | Normal | Aplicar último código |
-| `<leader>cr` | Normal | Substituir arquivo inteiro |
-| `<leader>cd` | Normal | Aplicar com preview diff |
-| `<leader>ci` | Normal | Mostrar informações |
-| `<leader>ch` | Normal | Mostrar ajuda |
-
-### Atalhos no Chat
-
-| Tecla | Ação |
-|-------|------|
-| `i`, `Enter` | Novo prompt |
-| `q`, `Esc` | Fechar chat |
-| `c` | Limpar chat e histórico |
-| `h` | Mostrar ajuda |
-| `Ctrl+n` | Próximo bloco de código |
-| `Ctrl+p` | Bloco anterior |
-
-### Atalhos no Preview de Código
-
-| Tecla | Ação |
-|-------|------|
-| `Ctrl+a` | Aplicar código no arquivo |
-| `Ctrl+c` | Copiar código |
-| `q`, `Esc` | Fechar preview |
-
-### Atalhos no Input
-
-| Tecla | Ação |
-|-------|------|
-| `Enter` | Enviar prompt |
-| `Ctrl+Enter` | Nova linha |
-| `Esc` | Cancelar |
-
-## 🎯 Comandos
-
-| Comando | Descrição |
-|---------|-----------|
-| `:SimpleCursorChat` | Abrir/fechar chat |
-| `:SimpleCursorPrompt` | Prompt rápido |
-| `:SimpleCursorSelectFiles` | Selecionar arquivos |
-| `:SimpleCursorListFiles` | Listar arquivos selecionados |
-| `:SimpleCursorToggleCurrentFile` | Toggle arquivo atual |
-| `:SimpleCursorApplyCode` | Aplicar último código |
-| `:SimpleCursorReplaceFile` | Substituir arquivo inteiro |
-| `:SimpleCursorDiffApply` | Aplicar com diff |
-| `:SimpleCursorClearFiles` | Limpar seleção de arquivos |
-| `:SimpleCursorClearChat` | Limpar chat |
-| `:SimpleCursorInfo` | Mostrar informações |
-| `:SimpleCursorHelp` | Mostrar ajuda |
-
-## 🚀 Fluxo de Trabalho
-
-### 1. Configuração Inicial
 ```bash
-# Obtenha sua API key em: https://console.anthropic.com/
-# Adicione ao seu shell profile (~/.bashrc, ~/.zshrc, etc.)
-export ANTHROPIC_API_KEY="sua-chave-aqui"
-
-# Recarregue o shell ou reinicie o terminal
-source ~/.bashrc  # ou ~/.zshrc
+export ANTHROPIC_API_KEY="your-api-key-here"
+# or
+export CLAUDE_API_KEY="your-api-key-here"
 ```
 
-### 2. Uso Básico
-1. Abra o Neovim em seu projeto
-2. Pressione `<leader>cc` para abrir o chat
-3. Digite seu prompt e pressione Enter
-4. O Claude responderá com código e explicações
+## 🎮 Usage
 
-### 3. Trabalhando com Código
-1. Quando Claude retornar código, use `Ctrl+n`/`Ctrl+p` para navegar entre blocos
-2. Pressione `Ctrl+a` no preview para aplicar o código
-3. Escolha como aplicar: substituir arquivo, inserir no cursor, ou anexar
+### Basic Commands
 
-### 4. Contexto de Arquivos
-1. Use `<leader>cf` para selecionar arquivos importantes
-2. Use `<leader>ct` para incluir o arquivo atual
-3. O Claude terá acesso a todos os arquivos selecionados para contexto
+| Command | Description |
+|---------|-------------|
+| `:AiliteChat` | Toggle the chat window |
+| `:AilitePrompt` | Quick prompt without opening chat |
+| `:AiliteSelectFiles` | Select files to include in context |
+| `:AiliteToggleFile` | Toggle current file in context |
+| `:AiliteClearChat` | Clear chat history |
+| `:AiliteInfo` | Show plugin information |
+| `:AiliteHelp` | Show help |
 
-### 5. Aplicação Rápida
-- `<leader>cr`: Substitui o arquivo inteiro com o último código
-- `<leader>cd`: Mostra um diff antes de aplicar
-- `<leader>ca`: Abre o preview do último código
+### Default Keybindings
 
-## 💡 Dicas e Truques
+| Mode | Key | Action |
+|------|-----|--------|
+| Normal | `<leader>cc` | Toggle chat window |
+| Normal | `<leader>cp` | Quick prompt |
+| Visual | `<leader>cp` | Prompt with selection |
+| Normal | `<leader>cf` | Select files for context |
+| Normal | `<leader>ct` | Toggle current file |
+| Normal | `<leader>ca` | Apply last code block |
+| Normal | `<leader>cr` | Replace file with code |
+| Normal | `<leader>cd` | Apply with diff preview |
 
-### Prompts Efetivos
+### Chat Interface Keys
+
+| Mode | Key | Action |
+|------|-----|--------|
+| Normal | `i`, `o`, `a` | Start new message |
+| Insert | `Ctrl+S` | Send message |
+| Insert | `Esc` | Cancel input |
+| Normal | `q` | Close chat |
+| Normal | `c` | Clear chat |
+| Normal | `h` | Show help |
+| Normal | `Ctrl+N` | Next code block |
+| Normal | `Ctrl+P` | Previous code block |
+
+## 📝 Interactive Chat Workflow
+
+1. **Open Chat**: Press `<leader>cc` or run `:AiliteChat`
+2. **Start Message**: Press `i` to enter input mode
+3. **Type Message**: Write your prompt (use Enter for new lines)
+4. **Send**: Press `Ctrl+S` to send to Claude
+5. **Navigate Code**: Use `Ctrl+N/P` to browse code blocks
+6. **Apply Code**: Press Enter on a code block to preview and apply
+
+## 🔍 Examples
+
+### Basic Code Generation
 ```
-"Refatore esta função para ser mais legível"
-"Adicione tratamento de erro neste código"
-"Converta este código para TypeScript"
-"Otimize esta função para performance"
-"Adicione documentação JSDoc"
-```
-
-### Seleção Visual
-1. Selecione código no modo visual
-2. Pressione `<leader>cp`
-3. O código selecionado será incluído automaticamente no contexto
-
-### Múltiplos Arquivos
-1. Use `<leader>cf` com Telescope para seleção rápida
-2. Selecione múltiplos arquivos com `Ctrl+a` no Telescope
-3. O Claude verá todo o contexto do projeto
-
-### Aplicação Segura
-- Sempre use `<leader>cd` para ver mudanças antes de aplicar
-- Mantenha backups ou use controle de versão
-- Teste em arquivos pequenos primeiro
-
-## 🔧 Solução de Problemas
-
-### API Key não encontrada
-```bash
-# Método recomendado: Variável de ambiente permanente
-echo 'export ANTHROPIC_API_KEY="sua-chave-aqui"' >> ~/.bashrc
-# ou para zsh:
-echo 'export ANTHROPIC_API_KEY="sua-chave-aqui"' >> ~/.zshrc
-
-# Recarregue o terminal
-source ~/.bashrc  # ou ~/.zshrc
-
-# Método alternativo: Configuração direta (não recomendado)
-require("nano-pilot").setup({
-  api_key = "sua-chave-aqui"  -- evite hardcoding da key
-})
+>>> Write a function to calculate fibonacci numbers in Python
 ```
 
-### Telescope não encontrado
-O plugin funciona sem Telescope, mas para melhor experiência:
+### Refactoring with Context
+```vim
+" 1. Select code visually
+" 2. Press <leader>cp
+" 3. Type your refactoring request
+```
+
+### Multiple File Context
+```vim
+:AiliteSelectFiles    " Select relevant files
+:AiliteChat          " Open chat
+" Now Claude has context of all selected files
+```
+
+### Quick Fixes
+```vim
+:AilitePrompt Fix the syntax error in this function
+```
+
+## 🎨 Customization
+
+### Custom Highlights
+
+The plugin defines these highlight groups that you can customize:
+
+```vim
+highlight SimpleCursorUser guifg=#61afef gui=bold
+highlight SimpleCursorAssistant guifg=#98c379 gui=bold
+highlight SimpleCursorPrompt guifg=#c678dd gui=bold
+```
+
+### Window Borders
+
+Customize window borders in your setup:
+
 ```lua
--- Instale telescope
-use "nvim-telescope/telescope.nvim"
+chat_window = {
+  border = "double", -- rounded, single, double, shadow, none
+}
 ```
 
-### Curl não disponível
-O plugin usa `curl` para chamadas da API. Instale com:
-```bash
-# Ubuntu/Debian
-sudo apt install curl
+## 🤝 Contributing
 
-# macOS
-brew install curl
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-# Windows
-# Curl já vem no Windows 10+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Inspired by [Cursor IDE](https://cursor.sh/) and [avante.nvim](https://github.com/yetone/avante.nvim)
+- Powered by [Anthropic's Claude API](https://www.anthropic.com/)
+- Built with ❤️ for the Neovim community
+
+## 🐛 Troubleshooting
+
+### API Key Issues
+```vim
+:AiliteInfo  " Check if API key is configured
 ```
 
-### Janelas não aparecem
-Verifique se o terminal suporta janelas flutuantes:
-- Use Neovim 0.7+
-- Terminal moderno (kitty, alacritty, wezterm)
+### Chat Not Opening
+- Ensure Neovim version is 0.8+
+- Check for conflicts with other plugins
+- Run `:checkhealth` for diagnostics
 
-## 🤝 Contribuindo
+### Code Not Applying
+- Make sure the target buffer is modifiable
+- Check if the file has write permissions
 
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+## 📮 Support
 
-## 📝 Roadmap
-
-- [ ] Suporte a múltiplos modelos (GPT-4, etc.)
-- [ ] Templates de prompts customizáveis
-- [ ] Integração com LSP para contexto semântico
-- [ ] Export/import de conversas
-- [ ] Plugins para linguagens específicas
-- [ ] Modo offline com modelos locais
-
-## 📄 Licença
-
-Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
-
-## 🙏 Agradecimentos
-
-- [Anthropic](https://anthropic.com) pela incrível API do Claude
-- [Cursor](https://cursor.sh) pela inspiração
-- Comunidade Neovim pelos plugins e ferramentas
-
----
-
-**Nano Pilot** - Transformando Neovim em uma IDE moderna com IA 🚀
+- Report bugs via [GitHub Issues](https://github.com/your-username/ailite.nvim/issues)
+- Request features through issues with the `enhancement` label
+- Join discussions in the [Discussions](https://github.com/your-username/ailite.nvim/discussions) tab

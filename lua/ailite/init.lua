@@ -1,5 +1,5 @@
 -- simple-cursor.nvim
--- Plugin estilo Cursor IDE para Neovim com integração Claude API e aplicação de código
+-- Plugin estilo Cursor IDE para Neovim com integração Claude API e chat interativo
 
 local M = {}
 local api = vim.api
@@ -28,15 +28,20 @@ M.config = {
 		next_code_block = "<C-n>",
 		prev_code_block = "<C-p>",
 		toggle_diff = "<C-d>",
+		send_message = "<C-s>",
+		new_line = "<CR>",
+		cancel_input = "<Esc>",
 	},
+	-- Configurações do chat interativo
+	chat_input_prefix = ">>> ",
+	assistant_prefix = "Claude: ",
+	user_prefix = "You: ",
 }
 
 -- Estado do plugin
 local state = {
 	chat_buf = nil,
 	chat_win = nil,
-	input_buf = nil,
-	input_win = nil,
 	code_preview_buf = nil,
 	code_preview_win = nil,
 	selected_files = {},
@@ -46,7 +51,14 @@ local state = {
 	current_code_block = 0,
 	original_buf = nil,
 	original_win = nil,
+	-- Estado do chat interativo
+	input_start_line = nil,
+	is_in_input_mode = false,
+	current_input_lines = {},
 }
+
+-- Namespace para highlights
+local ns_id = api.nvim_create_namespace("simple_cursor")
 
 -- Utilitários
 local function get_visual_selection()
@@ -107,16 +119,13 @@ local function apply_code_to_file(code, target_buf)
 	if choice == 1 then
 		-- Substituir todo o conteúdo do arquivo
 		local lines = vim.split(code, "\n")
-		-- Limpar o buffer completamente primeiro
 		api.nvim_buf_set_lines(target_buf, 0, -1, false, {})
-		-- Então adicionar o novo conteúdo
 		api.nvim_buf_set_lines(target_buf, 0, -1, false, lines)
 		vim.notify("✅ Arquivo completamente substituído", vim.log.levels.INFO)
 
 		-- Salvar o arquivo automaticamente se desejar
 		local save = fn.confirm("Deseja salvar o arquivo agora?", "&Sim\n&Não", 1)
 		if save == 1 then
-			-- Mudar para o buffer e salvar
 			local current_buf = api.nvim_get_current_buf()
 			api.nvim_set_current_buf(target_buf)
 			vim.cmd("write")
@@ -142,66 +151,443 @@ local function apply_code_to_file(code, target_buf)
 	end
 end
 
--- Função melhorada para adicionar mensagem ao chat
-local function append_to_chat(role, content)
+-- Função para renderizar mensagem no chat com formatação
+local function render_message_in_chat(role, content, start_line)
 	if not state.chat_buf or not api.nvim_buf_is_valid(state.chat_buf) then
 		return
 	end
 
-	-- Tornar o buffer modificável temporariamente
-	api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
-
-	local lines = api.nvim_buf_get_lines(state.chat_buf, 0, -1, false)
-	local new_lines = {}
-
-	if #lines > 0 then
-		table.insert(new_lines, "")
-		table.insert(new_lines, "---")
-		table.insert(new_lines, "")
-	end
-
-	-- Cabeçalho com timestamp
+	local lines = {}
 	local timestamp = os.date("%H:%M:%S")
-	if role == "user" then
-		table.insert(new_lines, string.format("**[%s] Você:**", timestamp))
-	else
-		table.insert(new_lines, string.format("**[%s] Claude:**", timestamp))
+
+	-- Adicionar separador se não for a primeira mensagem
+	if start_line > 0 then
+		table.insert(lines, "")
+		table.insert(
+			lines,
+			"─────────────────────────────────────"
+		)
+		table.insert(lines, "")
 	end
-	table.insert(new_lines, "")
+
+	-- Cabeçalho da mensagem
+	local header
+	if role == "user" then
+		header = string.format("%s [%s]", M.config.user_prefix, timestamp)
+	else
+		header = string.format("%s [%s]", M.config.assistant_prefix, timestamp)
+	end
+	table.insert(lines, header)
+	table.insert(lines, "")
 
 	-- Adicionar conteúdo
 	for line in content:gmatch("[^\r\n]+") do
-		table.insert(new_lines, line)
+		table.insert(lines, line)
 	end
 
-	api.nvim_buf_set_lines(state.chat_buf, -1, -1, false, new_lines)
+	-- Inserir linhas no buffer
+	api.nvim_buf_set_lines(state.chat_buf, start_line, start_line, false, lines)
 
-	-- Tornar o buffer não modificável novamente
+	-- Aplicar highlights
+	local header_line = start_line
+	if start_line > 0 then
+		header_line = start_line + 3 -- Pular linhas do separador
+	end
+
+	if role == "user" then
+		api.nvim_buf_add_highlight(state.chat_buf, ns_id, "SimpleCursorUser", header_line, 0, -1)
+	else
+		api.nvim_buf_add_highlight(state.chat_buf, ns_id, "SimpleCursorAssistant", header_line, 0, -1)
+	end
+
+	return #lines
+end
+
+-- Função para iniciar modo de input
+local function start_input_mode()
+	if state.is_processing then
+		vim.notify("⏳ Aguarde a resposta anterior...", vim.log.levels.WARN)
+		return
+	end
+
+	if not state.chat_buf or not api.nvim_buf_is_valid(state.chat_buf) then
+		return
+	end
+
+	-- Tornar buffer editável
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
+	api.nvim_buf_set_option(state.chat_buf, "readonly", false)
+
+	-- Adicionar prompt de input
+	local line_count = api.nvim_buf_line_count(state.chat_buf)
+	local prompt_lines = { "", M.config.chat_input_prefix }
+
+	api.nvim_buf_set_lines(state.chat_buf, -1, -1, false, prompt_lines)
+
+	-- Marcar início do input
+	state.input_start_line = line_count + 1
+	state.is_in_input_mode = true
+	state.current_input_lines = {}
+
+	-- Mover cursor para depois do prompt
+	if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
+		api.nvim_win_set_cursor(state.chat_win, { state.input_start_line + 1, #M.config.chat_input_prefix })
+	end
+
+	-- Aplicar highlight no prompt
+	api.nvim_buf_add_highlight(
+		state.chat_buf,
+		ns_id,
+		"SimpleCursorPrompt",
+		state.input_start_line,
+		0,
+		#M.config.chat_input_prefix
+	)
+
+	-- Entrar em modo insert
+	vim.cmd("startinsert!")
+end
+
+-- Função para processar input do usuário
+local function process_user_input()
+	if not state.is_in_input_mode or not state.input_start_line then
+		return
+	end
+
+	-- Pegar linhas do input
+	local current_line = api.nvim_buf_line_count(state.chat_buf)
+	local input_lines = api.nvim_buf_get_lines(state.chat_buf, state.input_start_line, current_line + 1, false)
+
+	-- Remover o prompt da primeira linha
+	if #input_lines > 0 then
+		input_lines[1] = input_lines[1]:sub(#M.config.chat_input_prefix + 1)
+	end
+
+	-- Juntar as linhas
+	local prompt = table.concat(input_lines, "\n"):gsub("^%s+", ""):gsub("%s+$", "")
+
+	if prompt == "" then
+		-- Remover linhas vazias do prompt
+		api.nvim_buf_set_lines(state.chat_buf, state.input_start_line - 1, -1, false, {})
+		state.is_in_input_mode = false
+		state.input_start_line = nil
+		return
+	end
+
+	-- Sair do modo de input
+	state.is_in_input_mode = false
+	state.input_start_line = nil
+
+	-- Tornar buffer não editável temporariamente
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+	api.nvim_buf_set_option(state.chat_buf, "readonly", true)
+
+	-- Processar o prompt
+	M.process_prompt(prompt)
+end
+
+-- Função para cancelar input
+local function cancel_input()
+	if not state.is_in_input_mode or not state.input_start_line then
+		return
+	end
+
+	-- Remover linhas do input
+	api.nvim_buf_set_lines(state.chat_buf, state.input_start_line - 1, -1, false, {})
+
+	-- Resetar estado
+	state.is_in_input_mode = false
+	state.input_start_line = nil
+
+	-- Tornar buffer não editável
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+	api.nvim_buf_set_option(state.chat_buf, "readonly", true)
+
+	-- Sair do modo insert
+	vim.cmd("stopinsert")
+end
+
+-- Função melhorada para criar janela de chat
+local function create_chat_window()
+	-- Salvar referência ao buffer/janela original
+	state.original_buf = api.nvim_get_current_buf()
+	state.original_win = api.nvim_get_current_win()
+
+	-- Criar buffer se não existir
+	if not state.chat_buf or not api.nvim_buf_is_valid(state.chat_buf) then
+		state.chat_buf = api.nvim_create_buf(false, true)
+		api.nvim_buf_set_option(state.chat_buf, "filetype", "markdown")
+		api.nvim_buf_set_option(state.chat_buf, "bufhidden", "hide")
+		api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+		api.nvim_buf_set_option(state.chat_buf, "readonly", true)
+		api.nvim_buf_set_name(state.chat_buf, "SimpleCursor-Chat")
+	end
+
+	-- Calcular posição
+	local width = M.config.chat_window.width
+	local height = M.config.chat_window.height
+	local row = math.floor((vim.o.lines - height) / 2)
+	local col = math.floor((vim.o.columns - width) / 2)
+
+	-- Criar janela
+	state.chat_win = api.nvim_open_win(state.chat_buf, true, {
+		relative = "editor",
+		row = row,
+		col = col,
+		width = width,
+		height = height,
+		border = M.config.chat_window.border,
+		style = "minimal",
+		title = " Simple Cursor Chat - 'i' para nova mensagem, 'h' para ajuda ",
+		title_pos = "center",
+	})
+
+	-- Configurações da janela
+	api.nvim_win_set_option(state.chat_win, "wrap", true)
+	api.nvim_win_set_option(state.chat_win, "linebreak", true)
+	api.nvim_win_set_option(state.chat_win, "cursorline", true)
+
+	-- Configurar keymaps para o modo normal
+	local opts = { noremap = true, silent = true, buffer = state.chat_buf }
+
+	-- Teclas básicas
+	vim.keymap.set("n", "q", function()
+		M.close_chat()
+	end, opts)
+
+	vim.keymap.set("n", "<Esc>", function()
+		if state.is_in_input_mode then
+			cancel_input()
+		else
+			M.close_chat()
+		end
+	end, opts)
+
+	vim.keymap.set("n", "c", function()
+		M.clear_chat()
+	end, opts)
+
+	vim.keymap.set("n", "i", function()
+		start_input_mode()
+	end, opts)
+
+	vim.keymap.set("n", "o", function()
+		start_input_mode()
+	end, opts)
+
+	vim.keymap.set("n", "a", function()
+		start_input_mode()
+	end, opts)
+
+	vim.keymap.set("n", "h", function()
+		M.show_help()
+	end, opts)
+
+	-- Navegação de blocos de código
+	vim.keymap.set("n", M.config.keymaps.next_code_block, function()
+		M.next_code_block()
+	end, opts)
+
+	vim.keymap.set("n", M.config.keymaps.prev_code_block, function()
+		M.prev_code_block()
+	end, opts)
+
+	-- Keymaps para modo insert (quando em input)
+	vim.keymap.set("i", M.config.keymaps.send_message, function()
+		process_user_input()
+		vim.cmd("stopinsert")
+	end, opts)
+
+	vim.keymap.set("i", "<C-c>", function()
+		cancel_input()
+	end, opts)
+
+	-- Configurar autocmds para o buffer
+	local group = api.nvim_create_augroup("SimpleCursorChat", { clear = true })
+
+	-- Prevenir edição fora da área de input
+	api.nvim_create_autocmd("TextChangedI", {
+		group = group,
+		buffer = state.chat_buf,
+		callback = function()
+			if not state.is_in_input_mode then
+				vim.cmd("stopinsert")
+				api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+			end
+		end,
+	})
+
+	-- Manter cursor na área de input
+	api.nvim_create_autocmd("CursorMovedI", {
+		group = group,
+		buffer = state.chat_buf,
+		callback = function()
+			if state.is_in_input_mode and state.input_start_line then
+				local cursor = api.nvim_win_get_cursor(0)
+				if cursor[1] < state.input_start_line + 1 then
+					api.nvim_win_set_cursor(0, { state.input_start_line + 1, #M.config.chat_input_prefix })
+				elseif cursor[1] == state.input_start_line + 1 and cursor[2] < #M.config.chat_input_prefix then
+					api.nvim_win_set_cursor(0, { state.input_start_line + 1, #M.config.chat_input_prefix })
+				end
+			end
+		end,
+	})
+
+	-- Mostrar mensagem de boas-vindas se o chat estiver vazio
+	local lines = api.nvim_buf_get_lines(state.chat_buf, 0, -1, false)
+	if #lines == 0 or (#lines == 1 and lines[1] == "") then
+		local welcome_msg = [[
+Bem-vindo ao Simple Cursor! 🚀
+
+Este é um chat interativo com Claude. Digite 'i' para começar uma nova mensagem.
+
+Comandos disponíveis:
+  • i, o, a  - Iniciar nova mensagem
+  • Ctrl+S   - Enviar mensagem (no modo insert)
+  • Esc      - Cancelar input ou fechar chat
+  • h        - Mostrar ajuda completa
+  • c        - Limpar chat
+  • q        - Fechar chat
+
+Comece digitando 'i' para enviar sua primeira mensagem!]]
+
+		api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
+		local welcome_lines = vim.split(welcome_msg, "\n")
+		api.nvim_buf_set_lines(state.chat_buf, 0, -1, false, welcome_lines)
+		api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+	end
+end
+
+-- Função para mostrar ajuda
+function M.show_help()
+	local help_text = string.format(
+		[[
+=== Simple Cursor - Ajuda ===
+
+COMANDOS NO CHAT:
+  i, o, a     - Iniciar nova mensagem
+  %s     - Enviar mensagem (modo insert)
+  Esc         - Cancelar input ou fechar chat
+  q           - Fechar chat
+  c           - Limpar chat e histórico
+  h           - Mostrar esta ajuda
+  %s       - Próximo bloco de código
+  %s       - Bloco de código anterior
+
+COMANDOS NO PREVIEW DE CÓDIGO:
+  %s       - Aplicar código no arquivo
+  %s       - Copiar código
+  q, Esc      - Fechar preview
+
+COMANDOS GLOBAIS:
+  :SimpleCursorChat          - Abrir/fechar chat
+  :SimpleCursorSelectFiles   - Selecionar arquivos para contexto
+  :SimpleCursorListFiles     - Listar arquivos selecionados
+  :SimpleCursorToggleFile    - Toggle arquivo atual
+  :SimpleCursorInfo          - Mostrar informações do estado
+  :SimpleCursorReplaceFile   - Substituir arquivo com último código
+  :SimpleCursorDiffApply     - Aplicar código com diff preview
+
+RECURSOS:
+  • Chat interativo estilo terminal
+  • Histórico completo mantido para contexto
+  • Arquivos selecionados incluídos automaticamente
+  • Blocos de código podem ser aplicados diretamente
+  • Suporta múltiplas formas de aplicação de código
+  • Syntax highlighting para código]],
+		M.config.keymaps.send_message,
+		M.config.keymaps.next_code_block,
+		M.config.keymaps.prev_code_block,
+		M.config.keymaps.apply_code,
+		M.config.keymaps.copy_code
+	)
+
+	vim.notify(help_text, vim.log.levels.INFO)
+end
+
+-- Função melhorada de processamento de prompt
+function M.process_prompt(prompt)
+	if not prompt or prompt == "" then
+		return
+	end
+
+	-- Resetar blocos de código
+	state.code_blocks = {}
+	state.current_code_block = 0
+
+	-- Adicionar prompt ao histórico
+	table.insert(state.chat_history, { role = "user", content = prompt })
+
+	-- Renderizar mensagem do usuário
+	local line_count = api.nvim_buf_line_count(state.chat_buf)
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
+
+	-- Limpar prompt de input se existir
+	if state.input_start_line then
+		api.nvim_buf_set_lines(state.chat_buf, state.input_start_line - 1, -1, false, {})
+	end
+
+	render_message_in_chat("user", prompt, api.nvim_buf_line_count(state.chat_buf))
 	api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
 
-	-- Rolar para o final
+	-- Indicar processamento
+	state.is_processing = true
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
+	local processing_line = api.nvim_buf_line_count(state.chat_buf)
+	api.nvim_buf_set_lines(state.chat_buf, -1, -1, false, { "", "🤔 Claude está pensando..." })
+	api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+
+	-- Scroll para o final
 	if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
 		local line_count = api.nvim_buf_line_count(state.chat_buf)
 		api.nvim_win_set_cursor(state.chat_win, { line_count, 0 })
 	end
 
-	-- Extrair blocos de código se for resposta do assistente
-	if role == "assistant" then
-		local blocks = extract_code_blocks(content)
-		if #blocks > 0 then
-			state.code_blocks = blocks
-			state.current_code_block = 1
-			vim.notify(
-				string.format(
-					"Encontrados %d blocos de código. Use %s/%s para navegar",
-					#blocks,
-					M.config.keymaps.prev_code_block,
-					M.config.keymaps.next_code_block
-				),
-				vim.log.levels.INFO
-			)
+	-- Fazer chamada assíncrona
+	vim.defer_fn(function()
+		local response = call_claude_api(prompt)
+
+		-- Remover indicador de processamento
+		if state.chat_buf and api.nvim_buf_is_valid(state.chat_buf) then
+			api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
+			api.nvim_buf_set_lines(state.chat_buf, processing_line, -1, false, {})
 		end
-	end
+
+		if response then
+			-- Renderizar resposta
+			render_message_in_chat("assistant", response, api.nvim_buf_line_count(state.chat_buf))
+			table.insert(state.chat_history, { role = "assistant", content = response })
+
+			-- Extrair blocos de código
+			local blocks = extract_code_blocks(response)
+			if #blocks > 0 then
+				state.code_blocks = blocks
+				state.current_code_block = 1
+				vim.notify(
+					string.format(
+						"Encontrados %d blocos de código. Use %s/%s para navegar",
+						#blocks,
+						M.config.keymaps.prev_code_block,
+						M.config.keymaps.next_code_block
+					),
+					vim.log.levels.INFO
+				)
+			end
+		else
+			api.nvim_buf_set_lines(state.chat_buf, -1, -1, false, { "", "❌ Erro ao obter resposta da API" })
+		end
+
+		api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
+		state.is_processing = false
+
+		-- Scroll para o final
+		if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
+			vim.defer_fn(function()
+				local line_count = api.nvim_buf_line_count(state.chat_buf)
+				api.nvim_win_set_cursor(state.chat_win, { line_count, 0 })
+			end, 50)
+		end
+	end, 100)
 end
 
 -- Função para mostrar preview de código
@@ -288,7 +674,31 @@ local function show_code_preview(block_index)
 	end
 end
 
--- Função para substituir arquivo completo (atalho direto)
+-- Função para navegar entre blocos de código
+function M.next_code_block()
+	if #state.code_blocks == 0 then
+		vim.notify("Nenhum bloco de código disponível", vim.log.levels.WARN)
+		return
+	end
+
+	state.current_code_block = state.current_code_block % #state.code_blocks + 1
+	show_code_preview(state.current_code_block)
+end
+
+function M.prev_code_block()
+	if #state.code_blocks == 0 then
+		vim.notify("Nenhum bloco de código disponível", vim.log.levels.WARN)
+		return
+	end
+
+	state.current_code_block = state.current_code_block - 1
+	if state.current_code_block < 1 then
+		state.current_code_block = #state.code_blocks
+	end
+	show_code_preview(state.current_code_block)
+end
+
+-- Função para substituir arquivo completo
 function M.replace_file_with_last_code()
 	if #state.code_blocks == 0 then
 		vim.notify("❌ Nenhum bloco de código disponível", vim.log.levels.ERROR)
@@ -335,7 +745,7 @@ function M.replace_file_with_last_code()
 	end
 end
 
--- Função melhorada para aplicar código com diff preview
+-- Função para aplicar código com diff preview
 function M.apply_code_with_diff()
 	if #state.code_blocks == 0 then
 		vim.notify("❌ Nenhum bloco de código disponível", vim.log.levels.ERROR)
@@ -434,269 +844,7 @@ function M.apply_code_with_diff()
 	})
 end
 
--- Função para navegar entre blocos de código
-function M.next_code_block()
-	if #state.code_blocks == 0 then
-		vim.notify("Nenhum bloco de código disponível", vim.log.levels.WARN)
-		return
-	end
-
-	state.current_code_block = state.current_code_block % #state.code_blocks + 1
-	show_code_preview(state.current_code_block)
-end
-
-function M.prev_code_block()
-	if #state.code_blocks == 0 then
-		vim.notify("Nenhum bloco de código disponível", vim.log.levels.WARN)
-		return
-	end
-
-	state.current_code_block = state.current_code_block - 1
-	if state.current_code_block < 1 then
-		state.current_code_block = #state.code_blocks
-	end
-	show_code_preview(state.current_code_block)
-end
-
--- Função melhorada para criar janela de chat
-local function create_chat_window()
-	-- Salvar referência ao buffer/janela original
-	state.original_buf = api.nvim_get_current_buf()
-	state.original_win = api.nvim_get_current_win()
-
-	-- Criar buffer se não existir
-	if not state.chat_buf or not api.nvim_buf_is_valid(state.chat_buf) then
-		state.chat_buf = api.nvim_create_buf(false, true)
-		api.nvim_buf_set_option(state.chat_buf, "filetype", "markdown")
-		api.nvim_buf_set_option(state.chat_buf, "bufhidden", "hide")
-		api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
-	end
-
-	-- Calcular posição
-	local width = M.config.chat_window.width
-	local height = M.config.chat_window.height
-	local row = math.floor((vim.o.lines - height) / 2)
-	local col = math.floor((vim.o.columns - width) / 2)
-
-	-- Criar janela
-	state.chat_win = api.nvim_open_win(state.chat_buf, true, {
-		relative = "editor",
-		row = row,
-		col = col,
-		width = width,
-		height = height,
-		border = M.config.chat_window.border,
-		style = "minimal",
-		title = " Simple Cursor Chat - 'i' para novo prompt, 'h' para ajuda ",
-		title_pos = "center",
-	})
-
-	-- Configurações da janela
-	api.nvim_win_set_option(state.chat_win, "wrap", true)
-	api.nvim_win_set_option(state.chat_win, "linebreak", true)
-	api.nvim_win_set_option(state.chat_win, "cursorline", true)
-
-	-- Keymaps
-	local opts = { noremap = true, silent = true, buffer = state.chat_buf }
-
-	vim.keymap.set("n", "q", function()
-		M.close_chat()
-	end, opts)
-	vim.keymap.set("n", "<Esc>", function()
-		M.close_chat()
-	end, opts)
-	vim.keymap.set("n", "c", function()
-		M.clear_chat()
-	end, opts)
-	vim.keymap.set("n", "i", function()
-		M.open_input()
-	end, opts)
-	vim.keymap.set("n", "<CR>", function()
-		M.open_input()
-	end, opts)
-	vim.keymap.set("n", "h", function()
-		M.show_help()
-	end, opts)
-	vim.keymap.set("n", M.config.keymaps.next_code_block, function()
-		M.next_code_block()
-	end, opts)
-	vim.keymap.set("n", M.config.keymaps.prev_code_block, function()
-		M.prev_code_block()
-	end, opts)
-
-	-- Mostrar mensagem de boas-vindas se o chat estiver vazio
-	local lines = api.nvim_buf_get_lines(state.chat_buf, 0, -1, false)
-	if #lines == 0 or (#lines == 1 and lines[1] == "") then
-		append_to_chat("system", "Bem-vindo ao Simple Cursor! ")
-	end
-end
-
--- Função para mostrar ajuda
-function M.show_help()
-	local help_text = [[
-=== Simple Cursor - Ajuda ===
-
-TECLAS NO CHAT:
-  i, Enter    - Novo prompt
-  q, Esc      - Fechar chat
-  c           - Limpar chat e histórico
-  h           - Mostrar esta ajuda
-  ]] .. M.config.keymaps.next_code_block .. [[       - Próximo bloco de código
-  ]] .. M.config.keymaps.prev_code_block .. [[       - Bloco de código anterior
-
-TECLAS NO PREVIEW DE CÓDIGO:
-  ]] .. M.config.keymaps.apply_code .. [[       - Aplicar código no arquivo
-  ]] .. M.config.keymaps.copy_code .. [[       - Copiar código
-  q, Esc      - Fechar preview
-
-COMANDOS:
-  :SimpleCursorChat          - Abrir/fechar chat
-  :SimpleCursorSelectFiles   - Selecionar arquivos para contexto
-  :SimpleCursorListFiles     - Listar arquivos selecionados
-  :SimpleCursorToggleFile    - Toggle arquivo atual
-  :SimpleCursorInfo          - Mostrar informações do estado
-
-RECURSOS:
-  - O chat mantém histórico completo para contexto
-  - Arquivos selecionados são incluídos automaticamente
-  - Blocos de código podem ser aplicados diretamente
-  - Suporta múltiplas formas de aplicação de código]]
-
-	vim.notify(help_text, vim.log.levels.INFO)
-end
-
--- Função para processar entrada com melhor feedback
-function M.open_input()
-	if state.is_processing then
-		vim.notify("⏳ Aguarde a resposta anterior...", vim.log.levels.WARN)
-		return
-	end
-
-	-- Criar buffer de input
-	if not state.input_buf or not api.nvim_buf_is_valid(state.input_buf) then
-		state.input_buf = api.nvim_create_buf(false, true)
-		api.nvim_buf_set_option(state.input_buf, "bufhidden", "wipe")
-	end
-
-	-- Limpar buffer
-	api.nvim_buf_set_lines(state.input_buf, 0, -1, false, {})
-
-	-- Posicionar abaixo do chat
-	local chat_config = api.nvim_win_get_config(state.chat_win)
-	local row = chat_config.row[false] + chat_config.height + 1
-	local col = chat_config.col[false]
-	local width = chat_config.width
-
-	-- Criar janela de input
-	state.input_win = api.nvim_open_win(state.input_buf, true, {
-		relative = "editor",
-		row = row,
-		col = col,
-		width = width,
-		height = 5,
-		border = M.config.chat_window.border,
-		style = "minimal",
-		title = " Digite seu prompt (Enter envia, Ctrl+Enter nova linha, Esc cancela) ",
-		title_pos = "center",
-	})
-
-	-- Entrar em modo insert
-	vim.cmd("startinsert")
-
-	-- Keymaps do input
-	local opts = { noremap = true, silent = true, buffer = state.input_buf }
-
-	-- Enter para enviar
-	vim.keymap.set("i", "<CR>", function()
-		local lines = api.nvim_buf_get_lines(state.input_buf, 0, -1, false)
-		local prompt = table.concat(lines, "\n")
-
-		-- Fechar janela de input
-		if state.input_win and api.nvim_win_is_valid(state.input_win) then
-			api.nvim_win_close(state.input_win, true)
-			state.input_win = nil
-		end
-
-		-- Focar no chat
-		if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
-			api.nvim_set_current_win(state.chat_win)
-		end
-
-		-- Processar se não vazio
-		if prompt:match("%S") then
-			M.process_prompt(prompt)
-		end
-	end, opts)
-
-	-- Esc para cancelar
-	vim.keymap.set("i", "<Esc>", function()
-		if state.input_win and api.nvim_win_is_valid(state.input_win) then
-			api.nvim_win_close(state.input_win, true)
-			state.input_win = nil
-		end
-		if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
-			api.nvim_set_current_win(state.chat_win)
-		end
-	end, opts)
-
-	-- Ctrl+Enter para nova linha
-	vim.keymap.set("i", "<C-CR>", function()
-		local pos = api.nvim_win_get_cursor(state.input_win)
-		api.nvim_buf_set_lines(state.input_buf, pos[1], pos[1], false, { "" })
-		api.nvim_win_set_cursor(state.input_win, { pos[1] + 1, 0 })
-	end, opts)
-end
-
--- Função melhorada de processamento de prompt
-function M.process_prompt(prompt)
-	if not prompt or prompt == "" then
-		return
-	end
-
-	-- Resetar blocos de código
-	state.code_blocks = {}
-	state.current_code_block = 0
-
-	-- Adicionar prompt ao chat
-	append_to_chat("user", prompt)
-
-	-- Adicionar ao histórico
-	table.insert(state.chat_history, { role = "user", content = prompt })
-
-	-- Indicar processamento
-	state.is_processing = true
-	append_to_chat("assistant", "🤔 Pensando...")
-
-	-- Fazer chamada assíncrona
-	vim.defer_fn(function()
-		local response = call_claude_api(prompt)
-
-		-- Remover indicador de processamento
-		if state.chat_buf and api.nvim_buf_is_valid(state.chat_buf) then
-			api.nvim_buf_set_option(state.chat_buf, "modifiable", true)
-			local lines = api.nvim_buf_get_lines(state.chat_buf, 0, -1, false)
-			-- Remover linha "Pensando..."
-			for i = #lines, 1, -1 do
-				if lines[i]:match("🤔 Pensando...") then
-					api.nvim_buf_set_lines(state.chat_buf, i - 1, i, false, {})
-					break
-				end
-			end
-			api.nvim_buf_set_option(state.chat_buf, "modifiable", false)
-		end
-
-		if response then
-			append_to_chat("assistant", response)
-			table.insert(state.chat_history, { role = "assistant", content = response })
-		else
-			append_to_chat("assistant", "❌ Erro ao obter resposta da API")
-		end
-
-		state.is_processing = false
-	end, 100)
-end
-
--- Funções auxiliares (mantenha as existentes como call_claude_api, get_selected_files_content, etc.)
+-- Funções auxiliares
 local function get_selected_files_content()
 	local content = {}
 
@@ -716,7 +864,7 @@ local function get_selected_files_content()
 	return table.concat(content, "\n\n")
 end
 
--- Função call_claude_api mantida
+-- Função call_claude_api
 call_claude_api = function(prompt)
 	if not M.config.api_key then
 		vim.notify(
@@ -796,7 +944,7 @@ call_claude_api = function(prompt)
 	return nil
 end
 
--- Funções de gerenciamento de arquivos (mantidas)
+-- Funções de gerenciamento de arquivos
 function M.toggle_file(filepath)
 	local index = nil
 	for i, file in ipairs(state.selected_files) do
@@ -919,18 +1067,21 @@ function M.clear_chat()
 		state.chat_history = {}
 		state.code_blocks = {}
 		state.current_code_block = 0
+		state.is_in_input_mode = false
+		state.input_start_line = nil
 		vim.notify("💬 Chat e histórico limpos")
 	end
 end
 
 function M.close_chat()
+	-- Cancelar input se estiver ativo
+	if state.is_in_input_mode then
+		cancel_input()
+	end
+
 	if state.chat_win and api.nvim_win_is_valid(state.chat_win) then
 		api.nvim_win_close(state.chat_win, true)
 		state.chat_win = nil
-	end
-	if state.input_win and api.nvim_win_is_valid(state.input_win) then
-		api.nvim_win_close(state.input_win, true)
-		state.input_win = nil
 	end
 	if state.code_preview_win and api.nvim_win_is_valid(state.code_preview_win) then
 		api.nvim_win_close(state.code_preview_win, true)
@@ -1061,16 +1212,12 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("SimpleCursorHelp", function()
 		M.show_help()
 	end, {})
-
-	-- Novos comandos para substituição
 	vim.api.nvim_create_user_command("SimpleCursorReplaceFile", function()
 		M.replace_file_with_last_code()
 	end, {})
 	vim.api.nvim_create_user_command("SimpleCursorDiffApply", function()
 		M.apply_code_with_diff()
 	end, {})
-
-	-- Comando para aplicar último bloco de código
 	vim.api.nvim_create_user_command("SimpleCursorApplyCode", function()
 		if #state.code_blocks > 0 then
 			show_code_preview(state.current_code_block or 1)
@@ -1110,9 +1257,9 @@ function M.setup(opts)
 	end
 
 	-- Criar highlight groups customizados
-	vim.api.nvim_set_hl(0, "SimpleCursorUser", { link = "Title" })
-	vim.api.nvim_set_hl(0, "SimpleCursorAssistant", { link = "String" })
-	vim.api.nvim_set_hl(0, "SimpleCursorCode", { link = "Comment" })
+	vim.api.nvim_set_hl(0, "SimpleCursorUser", { fg = "#61afef", bold = true })
+	vim.api.nvim_set_hl(0, "SimpleCursorAssistant", { fg = "#98c379", bold = true })
+	vim.api.nvim_set_hl(0, "SimpleCursorPrompt", { fg = "#c678dd", bold = true })
 
 	-- Notificar que o plugin foi carregado
 	if M.config.api_key then
