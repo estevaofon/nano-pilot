@@ -23,7 +23,7 @@ A lightweight, interactive AI coding assistant for Neovim with Claude API integr
 
 ```lua
 {
-  "your-username/ailite.nvim",
+  "estevaofon/ailite.nvim",
   dependencies = {
     "nvim-telescope/telescope.nvim", -- Optional, for file selection
   },
@@ -40,7 +40,7 @@ A lightweight, interactive AI coding assistant for Neovim with Claude API integr
 
 ```lua
 use {
-  "your-username/ailite.nvim",
+  "estevaofon/ailite.nvim",
   requires = {
     "nvim-telescope/telescope.nvim", -- Optional
   },
