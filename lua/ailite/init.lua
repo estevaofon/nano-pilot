@@ -559,7 +559,7 @@ local function create_chat_window()
 		height = height,
 		border = M.config.chat_window.border,
 		style = "minimal",
-		title = " Ailite Chat - Press 'i' for new message, 'h' for help ",
+		title = " Ailite Chat - Press 'i' for new message, 't' for help ",
 		title_pos = "center",
 	})
 
@@ -600,7 +600,7 @@ local function create_chat_window()
 		start_input_mode()
 	end, opts)
 
-	vim.keymap.set("n", "h", function()
+	vim.keymap.set("n", "t", function()
 		M.show_help()
 	end, opts)
 
@@ -666,7 +666,7 @@ Available commands:
   • i, o, a  - Start new message
   • Ctrl+S   - Send message (in insert mode)
   • Esc      - Cancel input or close chat
-  • h        - Show full help
+  • t        - Show full help
   • c        - Clear chat
   • q        - Close chat
 
@@ -691,7 +691,7 @@ CHAT COMMANDS:
   Esc         - Cancel input or close chat
   q           - Close chat
   c           - Clear chat and history
-  h           - Show this help
+  t           - Show this help
   %s       - Next code block
   %s       - Previous code block
 
