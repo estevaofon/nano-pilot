@@ -528,6 +528,108 @@ local function cancel_input()
 	vim.cmd("stopinsert")
 end
 
+-- Show code preview
+local function show_code_preview(block_index)
+	if not state.code_blocks or #state.code_blocks == 0 then
+		vim.notify("No code blocks available", vim.log.levels.WARN)
+		return
+	end
+
+	local block = state.code_blocks[block_index]
+	if not block then
+		return
+	end
+
+	-- Create preview buffer if it doesn't exist
+	if not state.code_preview_buf or not api.nvim_buf_is_valid(state.code_preview_buf) then
+		state.code_preview_buf = api.nvim_create_buf(false, true)
+		api.nvim_buf_set_option(state.code_preview_buf, "bufhidden", "hide")
+	end
+
+	-- SEMPRE atualizar o conteúdo do buffer, mesmo se a janela já existir
+	local lines = vim.split(block.code, "\n")
+	api.nvim_buf_set_lines(state.code_preview_buf, 0, -1, false, lines)
+
+	-- Set filetype based on language
+	if block.language and block.language ~= "" then
+		api.nvim_buf_set_option(state.code_preview_buf, "filetype", block.language)
+	end
+
+	-- Create window if it doesn't exist
+	if not state.code_preview_win or not api.nvim_win_is_valid(state.code_preview_win) then
+		local width = M.config.code_window.width
+		local height = M.config.code_window.height
+		local row = math.floor((vim.o.lines - height) / 2)
+		local col = math.floor((vim.o.columns - width) / 2)
+
+		state.code_preview_win = api.nvim_open_win(state.code_preview_buf, true, {
+			relative = "editor",
+			row = row,
+			col = col,
+			width = width,
+			height = height,
+			border = M.config.code_window.border,
+			style = "minimal",
+			title = string.format(" Code Block %d/%d - %s ", block_index, #state.code_blocks, block.language),
+			title_pos = "center",
+		})
+
+		-- Set up keymaps in preview
+		local opts = { noremap = true, silent = true, buffer = state.code_preview_buf }
+
+		-- Apply code
+		vim.keymap.set("n", M.config.keymaps.apply_code, function()
+			-- Usar o bloco atual correto
+			local current_block = state.code_blocks[state.current_code_block]
+			if current_block and state.original_buf and api.nvim_buf_is_valid(state.original_buf) then
+				apply_code_to_file(current_block.code, state.original_buf)
+				api.nvim_win_close(state.code_preview_win, true)
+				state.code_preview_win = nil
+			else
+				vim.notify("Original buffer not found", vim.log.levels.ERROR)
+			end
+		end, opts)
+
+		-- Copy code
+		vim.keymap.set("n", M.config.keymaps.copy_code, function()
+			-- Usar o bloco atual correto
+			local current_block = state.code_blocks[state.current_code_block]
+			if current_block then
+				vim.fn.setreg("+", current_block.code)
+				vim.notify("Code copied to clipboard", vim.log.levels.INFO)
+			end
+		end, opts)
+
+		-- Navigate to next/previous code block dentro da janela de preview
+		vim.keymap.set("n", M.config.keymaps.next_code_block, function()
+			M.next_code_block()
+		end, opts)
+
+		vim.keymap.set("n", M.config.keymaps.prev_code_block, function()
+			M.prev_code_block()
+		end, opts)
+
+		-- Close preview
+		vim.keymap.set("n", "q", function()
+			api.nvim_win_close(state.code_preview_win, true)
+			state.code_preview_win = nil
+		end, opts)
+
+		vim.keymap.set("n", "<Esc>", function()
+			api.nvim_win_close(state.code_preview_win, true)
+			state.code_preview_win = nil
+		end, opts)
+	else
+		-- Janela já existe - IMPORTANTE: atualizar o título para refletir o bloco atual
+		api.nvim_win_set_config(state.code_preview_win, {
+			title = string.format(" Code Block %d/%d - %s ", block_index, #state.code_blocks, block.language),
+		})
+
+		-- Garantir que o foco está na janela de preview
+		api.nvim_set_current_win(state.code_preview_win)
+	end
+end
+
 -- Create chat window
 local function create_chat_window()
 	-- Save reference to original buffer/window
@@ -728,90 +830,6 @@ FEATURES:
 	)
 
 	vim.notify(help_text, vim.log.levels.INFO)
-end
-
--- Show code preview
-local function show_code_preview(block_index)
-	if not state.code_blocks or #state.code_blocks == 0 then
-		vim.notify("No code blocks available", vim.log.levels.WARN)
-		return
-	end
-
-	local block = state.code_blocks[block_index]
-	if not block then
-		return
-	end
-
-	-- Create preview buffer if it doesn't exist
-	if not state.code_preview_buf or not api.nvim_buf_is_valid(state.code_preview_buf) then
-		state.code_preview_buf = api.nvim_create_buf(false, true)
-		api.nvim_buf_set_option(state.code_preview_buf, "bufhidden", "hide")
-	end
-
-	-- Set content
-	local lines = vim.split(block.code, "\n")
-	api.nvim_buf_set_lines(state.code_preview_buf, 0, -1, false, lines)
-
-	-- Set filetype based on language
-	if block.language and block.language ~= "" then
-		api.nvim_buf_set_option(state.code_preview_buf, "filetype", block.language)
-	end
-
-	-- Create window if it doesn't exist
-	if not state.code_preview_win or not api.nvim_win_is_valid(state.code_preview_win) then
-		local width = M.config.code_window.width
-		local height = M.config.code_window.height
-		local row = math.floor((vim.o.lines - height) / 2)
-		local col = math.floor((vim.o.columns - width) / 2)
-
-		state.code_preview_win = api.nvim_open_win(state.code_preview_buf, true, {
-			relative = "editor",
-			row = row,
-			col = col,
-			width = width,
-			height = height,
-			border = M.config.code_window.border,
-			style = "minimal",
-			title = string.format(" Code Block %d/%d - %s ", block_index, #state.code_blocks, block.language),
-			title_pos = "center",
-		})
-
-		-- Set up keymaps in preview
-		local opts = { noremap = true, silent = true, buffer = state.code_preview_buf }
-
-		-- Apply code
-		vim.keymap.set("n", M.config.keymaps.apply_code, function()
-			if state.original_buf and api.nvim_buf_is_valid(state.original_buf) then
-				apply_code_to_file(block.code, state.original_buf)
-				api.nvim_win_close(state.code_preview_win, true)
-				state.code_preview_win = nil
-			else
-				vim.notify("Original buffer not found", vim.log.levels.ERROR)
-			end
-		end, opts)
-
-		-- Copy code
-		vim.keymap.set("n", M.config.keymaps.copy_code, function()
-			vim.fn.setreg("+", block.code)
-			vim.notify("Code copied to clipboard", vim.log.levels.INFO)
-		end, opts)
-
-		-- Close preview
-		vim.keymap.set("n", "q", function()
-			api.nvim_win_close(state.code_preview_win, true)
-			state.code_preview_win = nil
-		end, opts)
-
-		vim.keymap.set("n", "<Esc>", function()
-			api.nvim_win_close(state.code_preview_win, true)
-			state.code_preview_win = nil
-		end, opts)
-	else
-		-- Update title
-		api.nvim_win_set_config(state.code_preview_win, {
-			title = string.format(" Code Block %d/%d - %s ", block_index, #state.code_blocks, block.language),
-		})
-	end
 end
 
 -- Navigate code blocks
