@@ -197,22 +197,20 @@ function M.send_final_streaming_question(original_prompt, callback)
 
 	callback("final_processing", {})
 
-	vim.defer_fn(function()
-		local messages = {}
+	local messages = {}
 
-		-- Add history for context
-		for _, msg in ipairs(state.plugin.chat_history) do
-			table.insert(messages, msg)
-		end
+	-- Add history for context
+	for _, msg in ipairs(state.plugin.chat_history) do
+		table.insert(messages, msg)
+	end
 
-		-- Add final question
-		table.insert(messages, {
-			role = "user",
-			content = final_message,
-		})
+	-- Add final question
+	table.insert(messages, {
+		role = "user",
+		content = final_message,
+	})
 
-		local response = api.call_api(messages)
-
+	api.call_api_async(messages, { animation_buf = state.plugin.chat_buf }, function(response)
 		if response then
 			callback("complete", { response = response })
 		else
@@ -222,7 +220,7 @@ function M.send_final_streaming_question(original_prompt, callback)
 		-- Reset streaming state
 		state.reset_streaming()
 		state.plugin.is_processing = false
-	end, 100)
+	end)
 end
 
 -- Process streaming parts
@@ -245,23 +243,21 @@ function M.process_streaming_parts(parts, original_prompt, callback)
 		message = part_message,
 	})
 
-	-- Send part
-	vim.defer_fn(function()
-		local messages = {}
+	-- Send part asynchronously
+	local messages = {}
 
-		-- Add history for context continuity
-		for _, msg in ipairs(state.plugin.chat_history) do
-			table.insert(messages, msg)
-		end
+	-- Add history for context continuity
+	for _, msg in ipairs(state.plugin.chat_history) do
+		table.insert(messages, msg)
+	end
 
-		-- Add current part
-		table.insert(messages, {
-			role = "user",
-			content = part_message,
-		})
+	-- Add current part
+	table.insert(messages, {
+		role = "user",
+		content = part_message,
+	})
 
-		local response = api.call_api(messages)
-
+	api.call_api_async(messages, {}, function(response)
 		if response then
 			-- Add to history for context continuity
 			state.add_to_history("assistant", response)
@@ -271,6 +267,11 @@ function M.process_streaming_parts(parts, original_prompt, callback)
 				total = #parts,
 				response = response,
 			})
+
+			-- Continue with next part after a delay
+			vim.defer_fn(function()
+				M.process_streaming_parts(parts, original_prompt, callback)
+			end, 1000)
 		else
 			-- Error handling
 			callback("error", {
@@ -281,14 +282,8 @@ function M.process_streaming_parts(parts, original_prompt, callback)
 			-- Reset streaming state on error
 			state.reset_streaming()
 			state.plugin.is_processing = false
-			return
 		end
-
-		-- Continue with next part
-		vim.defer_fn(function()
-			M.process_streaming_parts(parts, original_prompt, callback)
-		end, 1000) -- Give a bit more time between parts
-	end, 100)
+	end)
 end
 
 -- Send context in single message
@@ -317,14 +312,14 @@ function M.send_context_single(prompt, selected_files, callback)
 		content = context .. prompt,
 	})
 
-	-- Make API call
-	local response = api.call_api(messages)
-
-	if response then
-		callback("complete", { response = response })
-	else
-		callback("error", { message = "Failed to get response" })
-	end
+	-- Make async API call with animation
+	api.call_api_async(messages, { animation_buf = state.plugin.chat_buf }, function(response)
+		if response then
+			callback("complete", { response = response })
+		else
+			callback("error", { message = "Failed to get response" })
+		end
+	end)
 end
 
 -- Send context in streaming mode

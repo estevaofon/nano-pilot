@@ -154,7 +154,7 @@ function M.process_prompt(prompt)
 			vim.api.nvim_buf_set_option(state.plugin.chat_buf, "modifiable", true)
 			vim.api.nvim_buf_set_lines(state.plugin.chat_buf, -1, -1, false, {
 				"",
-				"🤔 Claude está analisando o contexto completo...",
+				"🤔   Claude is thinking...",
 			})
 			vim.api.nvim_buf_set_option(state.plugin.chat_buf, "modifiable", false)
 		elseif event_type == "complete" then
@@ -185,13 +185,11 @@ function M.process_prompt(prompt)
 		ui.render_message_in_chat(state.plugin.chat_buf, "user", prompt, line_count)
 		vim.api.nvim_buf_set_option(state.plugin.chat_buf, "modifiable", false)
 
-		-- Processing indicator
+		-- Processing indicator with animation
 		ui.show_processing_indicator(state.plugin.chat_buf)
 
-		-- Make call
-		vim.defer_fn(function()
-			context.send_context_single(prompt, state.plugin.selected_files, handle_response)
-		end, 100)
+		-- Make async call
+		context.send_context_single(prompt, state.plugin.selected_files, handle_response)
 	end
 end
 

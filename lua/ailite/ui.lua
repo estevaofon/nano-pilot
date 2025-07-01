@@ -204,7 +204,7 @@ end
 -- Show processing indicator
 function M.show_processing_indicator(buf)
 	vim.api.nvim_buf_set_option(buf, "modifiable", true)
-	vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "", "🤔 Claude is thinking..." })
+	vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "", "🤔 Claude is thinking" })
 	vim.api.nvim_buf_set_option(buf, "modifiable", false)
 end
 
