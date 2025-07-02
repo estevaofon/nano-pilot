@@ -10,11 +10,14 @@ local utils = require("ailite.utils")
 function M.create_chat_window(chat_buf)
 	local cfg = config.get()
 
-	-- Calculate position
+	-- Calculate dimensions for full right side
 	local width = cfg.chat_window.width
-	local height = cfg.chat_window.height
-	local row = math.floor((vim.o.lines - height) / 2)
-	local col = math.floor((vim.o.columns - width) / 2)
+	-- Use full height minus status line and command line
+	local height = vim.o.lines - 2
+	-- Start from top
+	local row = 0
+	-- Position on the right side
+	local col = vim.o.columns - width
 
 	-- Create window
 	local win = vim.api.nvim_open_win(chat_buf, true, {

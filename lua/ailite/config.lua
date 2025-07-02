@@ -11,7 +11,7 @@ M.defaults = {
 	temperature = 0.7,
 	history_limit = 20,
 	chat_window = {
-		width = 100,
+		width = 90,
 		height = 35,
 		border = "rounded",
 	},
