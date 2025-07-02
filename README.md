@@ -54,8 +54,14 @@ use {
 
 ## 🔧 Configuration
 
-### Setup
-
+### Basic Setup
+```lua
+require("ailite").setup {
+  -- API Configuration
+  api_key = "your-claude-api-key", -- Set your API key here or use environment variables
+}
+```
+### Custom Configuration
 ```lua
 require("ailite").setup({
   -- API Configuration
@@ -102,6 +108,11 @@ export ANTHROPIC_API_KEY="your-api-key-here"
 # or
 export CLAUDE_API_KEY="your-api-key-here"
 ```
+
+```powershell
+$env:ANTHROPIC_API_KEY ="your-api-key-here"
+```
+
 
 ## 🎮 Usage
 
