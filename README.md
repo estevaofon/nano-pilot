@@ -6,6 +6,8 @@ A lightweight, interactive AI coding assistant for Neovim with Claude API integr
 ![Lua](https://img.shields.io/badge/Lua-5.1+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+https://github.com/user-attachments/assets/5f0c5118-55dd-43b3-b676-d9e35a82ac0f
+
 ## ✨ Features
 
 - **Interactive Terminal-Style Chat**: Type directly in the chat buffer, no popup windows
