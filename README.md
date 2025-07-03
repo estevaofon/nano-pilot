@@ -211,10 +211,6 @@ chat_window = {
 }
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -249,7 +245,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🤝 Feel Free to Contribute
 
-We welcome contributions of all kinds! Whether you're a seasoned developer or just getting started with Neovim plugins, there are many ways to help improve ailite.nvim:
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ### Ways to Contribute
 
