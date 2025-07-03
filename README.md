@@ -175,7 +175,6 @@ When Claude provides code in the chat, you can:
    - Insert at cursor position
    - Append to end of file
    - Cancel
-You can also use `<leader>ca` from any buffer to apply the last code block from the chat.
 
 
 ## 🔍 Examples
