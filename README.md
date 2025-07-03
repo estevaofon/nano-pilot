@@ -152,7 +152,7 @@ $env:ANTHROPIC_API_KEY ="your-api-key-here"
 | Insert | `Esc` | Cancel input |
 | Normal | `q` | Close chat |
 | Normal | `c` | Clear chat |
-| Normal | `h` | Show help |
+| Normal | `t` | Show help |
 | Normal | `Ctrl+N` | Next code block |
 | Normal | `Ctrl+P` | Previous code block |
 | Normal | `Ctrl+A` | Apply code block to file |
