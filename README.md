@@ -155,6 +155,7 @@ $env:ANTHROPIC_API_KEY ="your-api-key-here"
 | Normal | `h` | Show help |
 | Normal | `Ctrl+N` | Next code block |
 | Normal | `Ctrl+P` | Previous code block |
+| Normal | `Ctrl+A` | Apply code block to file |
 
 ## 📝 Interactive Chat Workflow
 
@@ -163,7 +164,19 @@ $env:ANTHROPIC_API_KEY ="your-api-key-here"
 3. **Type Message**: Write your prompt (use Enter for new lines)
 4. **Send**: Press `Ctrl+S` to send to Claude
 5. **Navigate Code**: Use `Ctrl+N/P` to browse code blocks
-6. **Apply Code**: Press Enter on a code block to preview and apply
+6. **Apply Code**: Use `Ctrl+a` to apply the code previewed
+
+### Applying Code Blocks
+When Claude provides code in the chat, you can:
+1. Navigate between code blocks using `Ctrl+N` and `Ctrl+P`
+2. Press `Ctrl+A` to apply the current code block
+3. Choose how to apply the code:
+   - Replace entire file
+   - Insert at cursor position
+   - Append to end of file
+   - Cancel
+You can also use `<leader>ca` from any buffer to apply the last code block from the chat.
+
 
 ## 🔍 Examples
 
@@ -186,22 +199,7 @@ $env:ANTHROPIC_API_KEY ="your-api-key-here"
 " Now Claude has context of all selected files
 ```
 
-### Quick Fixes
-```vim
-:AilitePrompt Fix the syntax error in this function
-```
-
 ## 🎨 Customization
-
-### Custom Highlights
-
-The plugin defines these highlight groups that you can customize:
-
-```vim
-highlight SimpleCursorUser guifg=#61afef gui=bold
-highlight SimpleCursorAssistant guifg=#98c379 gui=bold
-highlight SimpleCursorPrompt guifg=#c678dd gui=bold
-```
 
 ### Window Borders
 
@@ -245,6 +243,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📮 Support
 
-- Report bugs via [GitHub Issues](https://github.com/your-username/ailite.nvim/issues)
+- Report bugs via [GitHub Issues](https://github.com/estevaofon/ailite.nvim/issues)
 - Request features through issues with the `enhancement` label
-- Join discussions in the [Discussions](https://github.com/your-username/ailite.nvim/discussions) tab
+- Join discussions in the [Discussions](https://github.com/estevaofon/ailite.nvim/discussions) tab
+
+## 🤝 Feel Free to Contribute
+
+We welcome contributions of all kinds! Whether you're a seasoned developer or just getting started with Neovim plugins, there are many ways to help improve ailite.nvim:
+
+### Ways to Contribute
+
+- **Bug Reports**: Found a bug? Open an issue with steps to reproduce
+- **Feature Requests**: Have an idea? Share it in the issues section
+- **Code Contributions**: Submit pull requests for bug fixes or new features
+
+### Development Focus Areas
+
+- Improving code block detection and application
+- Enhancing the diff preview feature
+- Adding support for more Claude API features
+- Enhancing the chat interface
+- Adding tests and improving reliability
