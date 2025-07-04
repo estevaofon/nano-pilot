@@ -6,6 +6,20 @@ local M = {}
 -- Namespace for highlights
 M.ns_id = vim.api.nvim_create_namespace("ailite")
 
+-- Normalize file path to use forward slashes consistently
+function M.normalize_path(filepath)
+	if not filepath then
+		return nil
+	end
+	-- Replace backslashes with forward slashes
+	local normalized = filepath:gsub("\\", "/")
+	-- Get absolute path to handle relative paths consistently
+	normalized = vim.fn.fnamemodify(normalized, ":p")
+	-- Ensure forward slashes
+	normalized = normalized:gsub("\\", "/")
+	return normalized
+end
+
 -- Get visual selection
 function M.get_visual_selection()
 	local start_pos = vim.fn.getpos("'<")
@@ -59,6 +73,12 @@ end
 
 -- Read file content
 function M.read_file(filepath)
+	-- Normalize path before reading
+	filepath = M.normalize_path(filepath)
+	if not filepath then
+		return nil
+	end
+
 	local file = io.open(filepath, "r")
 	if file then
 		local content = file:read("*all")
@@ -99,7 +119,14 @@ end
 
 -- Get relative path
 function M.get_relative_path(filepath)
-	return vim.fn.fnamemodify(filepath, ":~:.")
+	-- Normalize path first
+	filepath = M.normalize_path(filepath)
+	if not filepath then
+		return ""
+	end
+	local relative = vim.fn.fnamemodify(filepath, ":~:.")
+	-- Ensure forward slashes in relative path too
+	return relative:gsub("\\", "/")
 end
 
 -- Split text into lines

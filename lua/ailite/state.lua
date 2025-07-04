@@ -59,16 +59,34 @@ function M.reset_streaming()
 	}
 end
 
--- File management
+-- File management with path normalization
 function M.add_file(filepath)
-	if not vim.tbl_contains(M.plugin.selected_files, filepath) then
-		table.insert(M.plugin.selected_files, filepath)
-		return true
+	-- Normalize path before adding
+	local utils = require("ailite.utils")
+	filepath = utils.normalize_path(filepath)
+	if not filepath then
+		return false
 	end
-	return false
+
+	-- Check if already exists (with normalized path)
+	for _, existing_file in ipairs(M.plugin.selected_files) do
+		if existing_file == filepath then
+			return false
+		end
+	end
+
+	table.insert(M.plugin.selected_files, filepath)
+	return true
 end
 
 function M.remove_file(filepath)
+	-- Normalize path before removing
+	local utils = require("ailite.utils")
+	filepath = utils.normalize_path(filepath)
+	if not filepath then
+		return false
+	end
+
 	for i, file in ipairs(M.plugin.selected_files) do
 		if file == filepath then
 			table.remove(M.plugin.selected_files, i)

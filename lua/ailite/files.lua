@@ -8,13 +8,20 @@ local utils = require("ailite.utils")
 
 -- Toggle file in selection
 function M.toggle_file(filepath)
+	-- Normalize the path
+	filepath = utils.normalize_path(filepath)
+	if not filepath then
+		utils.notify("Invalid file path", vim.log.levels.ERROR)
+		return
+	end
+
 	local removed = state.remove_file(filepath)
 
 	if removed then
-		utils.notify("📄 File removed: " .. filepath)
+		utils.notify("📄 File removed: " .. utils.get_relative_path(filepath))
 	else
 		state.add_file(filepath)
-		utils.notify("📄 File added: " .. filepath)
+		utils.notify("📄 File added: " .. utils.get_relative_path(filepath))
 	end
 end
 
@@ -59,9 +66,9 @@ function M.select_files_telescope(telescope)
 			map("i", "<C-x>", function()
 				local selection = action_state.get_selected_entry()
 				if selection then
-					local filepath = selection.path or selection.filename
-					if state.remove_file(filepath) then
-						utils.notify("File removed: " .. filepath)
+					local filepath = utils.normalize_path(selection.path or selection.filename)
+					if filepath and state.remove_file(filepath) then
+						utils.notify("File removed: " .. utils.get_relative_path(filepath))
 					end
 				end
 			end)
@@ -73,8 +80,8 @@ function M.select_files_telescope(telescope)
 
 				local added = 0
 				for _, selection in ipairs(multi_selections) do
-					local filepath = selection.path or selection.filename
-					if state.add_file(filepath) then
+					local filepath = utils.normalize_path(selection.path or selection.filename)
+					if filepath and state.add_file(filepath) then
 						added = added + 1
 					end
 				end
@@ -108,7 +115,8 @@ function M.list_selected_files()
 
 	local file_list = {}
 	for i, file in ipairs(files) do
-		table.insert(file_list, string.format("%d. %s", i, file))
+		-- Use relative path for display
+		table.insert(file_list, string.format("%d. %s", i, utils.get_relative_path(file)))
 	end
 
 	utils.notify("📁 Selected files:\n" .. table.concat(file_list, "\n"), vim.log.levels.INFO)
@@ -128,7 +136,9 @@ function M.get_selected_files_content()
 		local file_content = utils.read_file(filepath)
 		if file_content then
 			local extension = utils.get_file_extension(filepath)
-			table.insert(content, string.format("### File: %s\n```%s\n%s\n```", filepath, extension, file_content))
+			-- Use relative path for display
+			local display_path = utils.get_relative_path(filepath)
+			table.insert(content, string.format("### File: %s\n```%s\n%s\n```", display_path, extension, file_content))
 		end
 	end
 
