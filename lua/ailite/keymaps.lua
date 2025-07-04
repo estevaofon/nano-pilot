@@ -45,6 +45,13 @@ function M.setup()
 	for _, map in ipairs(keymaps) do
 		vim.keymap.set(map[1], map[2], map[3], { desc = map[4], noremap = true, silent = true })
 	end
+
+	-- Special handling for visual mode to preserve selection
+	vim.keymap.set("x", "<leader>cp", ":<C-U>lua require('ailite').prompt_with_selection()<CR>", {
+		desc = "Ailite Prompt with Selection",
+		noremap = true,
+		silent = true,
+	})
 end
 
 return M

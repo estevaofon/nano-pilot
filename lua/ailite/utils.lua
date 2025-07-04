@@ -136,7 +136,18 @@ end
 
 -- Get user input
 function M.input(prompt, default, completion)
-	return vim.fn.input(prompt, default or "", completion)
+	-- Build arguments table based on what's provided
+	local args = { prompt }
+
+	if default ~= nil or completion ~= nil then
+		table.insert(args, default or "")
+	end
+
+	if completion ~= nil then
+		table.insert(args, completion)
+	end
+
+	return vim.fn.input(unpack(args))
 end
 
 return M

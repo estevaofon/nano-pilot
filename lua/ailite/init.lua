@@ -162,7 +162,54 @@ function M.prompt_with_selection()
 	local state = require("ailite.state")
 	local chat = require("ailite.chat")
 
-	local selection = utils.get_visual_selection()
+	-- Get lines using '< and '> marks which are set by :<C-U>
+	local start_line = vim.fn.line("'<")
+	local end_line = vim.fn.line("'>")
+	local start_col = vim.fn.col("'<")
+	local end_col = vim.fn.col("'>")
+
+	-- Get the buffer content
+	local lines = vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false)
+
+	if #lines == 0 then
+		utils.notify("No selection found", vim.log.levels.WARN)
+		return
+	end
+
+	local selection = ""
+
+	-- Check the last visual mode used
+	local vmode = vim.fn.visualmode(1)
+
+	if vmode == "v" then
+		-- Character-wise selection
+		if #lines == 1 then
+			selection = string.sub(lines[1], start_col, end_col)
+		else
+			-- First line: from start_col to end
+			lines[1] = string.sub(lines[1], start_col)
+			-- Last line: from start to end_col
+			lines[#lines] = string.sub(lines[#lines], 1, end_col)
+			selection = table.concat(lines, "\n")
+		end
+	elseif vmode == "V" then
+		-- Line-wise selection
+		selection = table.concat(lines, "\n")
+	elseif vmode == "\22" then -- Ctrl-V block selection
+		-- Block selection
+		for i, line in ipairs(lines) do
+			local extracted = string.sub(line, start_col, end_col)
+			if i == 1 then
+				selection = extracted
+			else
+				selection = selection .. "\n" .. extracted
+			end
+		end
+	else
+		-- Fallback
+		selection = table.concat(lines, "\n")
+	end
+
 	if selection == "" then
 		utils.notify("No selection found", vim.log.levels.WARN)
 		return
