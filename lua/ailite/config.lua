@@ -32,6 +32,7 @@ M.defaults = {
 	},
 	-- Interactive chat configuration
 	chat_input_prefix = ">>> ",
+	assistant_name = "Claude", -- New configuration option
 	assistant_prefix = "Claude: ",
 	user_prefix = "You: ",
 	-- Context configuration for large files

@@ -148,10 +148,14 @@ end
 
 -- Show welcome message
 function M.show_welcome_message(buf)
-	local welcome_msg = [[
+	local cfg = config.get()
+	local assistant_name = cfg.assistant_name or "Claude"
+
+	local welcome_msg = string.format(
+		[[
 Welcome to Ailite! 🚀
 
-This is an interactive chat with Claude. Press 'i' to start a new message.
+This is an interactive chat with %s. Press 'i' to start a new message.
 
 Available commands:
   • i, o, a  - Start new message
@@ -161,7 +165,9 @@ Available commands:
   • c        - Clear chat
   • q        - Close chat
 
-Start by pressing 'i' to send your first message!]]
+Start by pressing 'i' to send your first message!]],
+		assistant_name
+	)
 
 	vim.api.nvim_buf_set_option(buf, "modifiable", true)
 	local welcome_lines = utils.split_lines(welcome_msg)
@@ -206,8 +212,11 @@ end
 
 -- Show processing indicator
 function M.show_processing_indicator(buf)
+	local cfg = config.get()
+	local assistant_name = cfg.assistant_name or "Claude"
+
 	vim.api.nvim_buf_set_option(buf, "modifiable", true)
-	vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "", "🤔 Claude is thinking" })
+	vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "", "🤔 " .. assistant_name .. " is thinking" })
 	vim.api.nvim_buf_set_option(buf, "modifiable", false)
 end
 

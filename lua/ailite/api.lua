@@ -47,15 +47,18 @@ local function start_loading_animation(buf)
 			local line_count = vim.api.nvim_buf_line_count(buf)
 			local lines = vim.api.nvim_buf_get_lines(buf, line_count - 1, line_count, false)
 
+			-- Get assistant name from config
+			local cfg = config.get()
+			local assistant_name = cfg.assistant_name or "Claude"
+
 			-- Only update if it's the loading line
-			-- No start_loading_animation, modifique a parte que atualiza o frame:
 			if lines[1] and lines[1]:match("🤔") then
 				vim.api.nvim_buf_set_lines(
 					buf,
 					line_count - 1,
 					line_count,
 					false,
-					{ "🤔 Claude is thinking" .. animation_frames[animation_index] }
+					{ "🤔 " .. assistant_name .. " is thinking" .. animation_frames[animation_index] }
 				)
 			end
 			vim.api.nvim_buf_set_option(buf, "modifiable", false)

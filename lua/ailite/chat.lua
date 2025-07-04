@@ -140,6 +140,9 @@ function M.process_prompt(prompt)
 
 	-- Define callback for handling responses
 	local function handle_response(event_type, data)
+		local current_cfg = config.get()
+		local assistant_name = current_cfg.assistant_name or "Claude"
+
 		if event_type == "progress" then
 			ui.show_streaming_progress(state.plugin.chat_buf, data.current, data.total, #data.message)
 		elseif event_type == "part_complete" then
@@ -154,7 +157,7 @@ function M.process_prompt(prompt)
 			vim.api.nvim_buf_set_option(state.plugin.chat_buf, "modifiable", true)
 			vim.api.nvim_buf_set_lines(state.plugin.chat_buf, -1, -1, false, {
 				"",
-				"🤔   Claude is thinking...",
+				"🤔 " .. assistant_name .. " is thinking...",
 			})
 			vim.api.nvim_buf_set_option(state.plugin.chat_buf, "modifiable", false)
 		elseif event_type == "complete" then
