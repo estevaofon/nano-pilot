@@ -259,3 +259,5 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 - Adding support for more Claude API features
 - Enhancing the chat interface
 - Adding tests and improving reliability
+- Add unit tests for critical components
+- Allow other AI models in the future
