@@ -105,6 +105,23 @@ function M.setup_highlights()
 	vim.api.nvim_set_hl(0, "AiliteUser", { fg = "#61afef", bold = true })
 	vim.api.nvim_set_hl(0, "AiliteAssistant", { fg = "#98c379", bold = true })
 	vim.api.nvim_set_hl(0, "AilitePrompt", { fg = "#c678dd", bold = true })
+
+	-- Diff highlights - using standard diff colors
+	-- These will work with most color schemes
+	vim.api.nvim_set_hl(0, "AiliteDiffAdd", { link = "DiffAdd", default = true })
+	vim.api.nvim_set_hl(0, "AiliteDiffDelete", { link = "DiffDelete", default = true })
+	vim.api.nvim_set_hl(0, "AiliteDiffChange", { link = "DiffChange", default = true })
+
+	-- Fallback colors if DiffAdd/DiffDelete are not defined
+	if vim.fn.hlexists("DiffAdd") == 0 then
+		vim.api.nvim_set_hl(0, "DiffAdd", { bg = "#1a3a1a", fg = "#98c379" })
+	end
+	if vim.fn.hlexists("DiffDelete") == 0 then
+		vim.api.nvim_set_hl(0, "DiffDelete", { bg = "#3a1a1a", fg = "#e06c75" })
+	end
+	if vim.fn.hlexists("DiffChange") == 0 then
+		vim.api.nvim_set_hl(0, "DiffChange", { fg = "#61afef", bold = true })
+	end
 end
 
 -- Get file extension

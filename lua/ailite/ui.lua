@@ -73,8 +73,8 @@ end
 
 -- Create diff window
 function M.create_diff_window(buf)
-	local width = 80
-	local height = 25
+	local width = math.min(100, math.floor(vim.o.columns * 0.8))
+	local height = math.min(35, math.floor(vim.o.lines * 0.8))
 	local row = math.floor((vim.o.lines - height) / 2)
 	local col = math.floor((vim.o.columns - width) / 2)
 
@@ -86,9 +86,16 @@ function M.create_diff_window(buf)
 		height = height,
 		border = "rounded",
 		style = "minimal",
-		title = " Confirm Replacement ",
+		title = " 🔍 Diff Preview - Review Changes ",
 		title_pos = "center",
 	})
+
+	-- Set window options for better readability
+	vim.api.nvim_win_set_option(win, "wrap", false)
+	vim.api.nvim_win_set_option(win, "cursorline", true)
+	vim.api.nvim_win_set_option(win, "number", false)
+	vim.api.nvim_win_set_option(win, "relativenumber", false)
+	vim.api.nvim_win_set_option(win, "signcolumn", "no")
 
 	return win
 end

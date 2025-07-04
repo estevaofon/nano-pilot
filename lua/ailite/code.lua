@@ -230,42 +230,99 @@ function M.apply_code_with_diff()
 
 	-- Create temporary buffer for diff
 	local diff_buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_option(diff_buf, "filetype", "diff")
+
 	local block = state.get_current_code_block() or blocks[1]
 
 	-- Get current content
 	local current_lines = vim.api.nvim_buf_get_lines(state.plugin.original_buf, 0, -1, false)
 	local new_lines = utils.split_lines(block.code)
 
-	-- Create diff preview
-	local diff_lines = {
-		"=== DIFF PREVIEW ===",
-		"",
-		"CURRENT FILE (" .. #current_lines .. " lines) -> NEW CONTENT (" .. #new_lines .. " lines)",
-		"",
-		"--- First lines of current file ---",
-	}
+	-- Use vim.diff for professional diff output
+	local current_content = table.concat(current_lines, "\n")
+	local new_content = table.concat(new_lines, "\n")
 
-	-- Show first 10 lines of each
-	for i = 1, math.min(10, #current_lines) do
-		table.insert(diff_lines, current_lines[i])
-	end
-	if #current_lines > 10 then
-		table.insert(diff_lines, "... (" .. (#current_lines - 10) .. " lines omitted)")
-	end
+	local diff_output = vim.diff(current_content, new_content, {
+		algorithm = "histogram",
+		ctxlen = 3,
+		interhunkctxlen = 0,
+		linematch = true,
+	})
 
+	-- Parse and format the diff
+	local diff_lines = {}
+	local highlights = {} -- Store highlight information
+
+	-- Add header
+	table.insert(
+		diff_lines,
+		"╭─────────────────────────────────────────────────────────╮"
+	)
+	table.insert(diff_lines, "│                    DIFF PREVIEW                         │")
+	table.insert(
+		diff_lines,
+		"╰─────────────────────────────────────────────────────────╯"
+	)
 	table.insert(diff_lines, "")
-	table.insert(diff_lines, "+++ First lines of new content +++")
-	for i = 1, math.min(10, #new_lines) do
-		table.insert(diff_lines, new_lines[i])
+
+	local filename = utils.get_file_name(vim.api.nvim_buf_get_name(state.plugin.original_buf))
+	table.insert(diff_lines, "File: " .. filename)
+	table.insert(diff_lines, string.format("@@ %d lines → %d lines @@", #current_lines, #new_lines))
+	table.insert(diff_lines, "")
+
+	-- Process diff output line by line
+	local line_num = #diff_lines + 1
+	for line in diff_output:gmatch("[^\r\n]+") do
+		if line:match("^@@") then
+			-- Hunk header
+			table.insert(diff_lines, line)
+			table.insert(highlights, { line = line_num, type = "hunk" })
+		elseif line:match("^%-") then
+			-- Deletion
+			table.insert(diff_lines, line)
+			table.insert(highlights, { line = line_num, type = "delete" })
+		elseif line:match("^%+") then
+			-- Addition
+			table.insert(diff_lines, line)
+			table.insert(highlights, { line = line_num, type = "add" })
+		else
+			-- Context or other
+			table.insert(diff_lines, line)
+		end
+		line_num = line_num + 1
 	end
-	if #new_lines > 10 then
-		table.insert(diff_lines, "... (" .. (#new_lines - 10) .. " lines omitted)")
-	end
+
+	-- Add footer with instructions
+	table.insert(diff_lines, "")
+	table.insert(
+		diff_lines,
+		"─────────────────────────────────────────────────────────"
+	)
+	table.insert(diff_lines, "         Press 'y' to apply, 'n' to cancel              ")
+	table.insert(
+		diff_lines,
+		"─────────────────────────────────────────────────────────"
+	)
 
 	vim.api.nvim_buf_set_lines(diff_buf, 0, -1, false, diff_lines)
 
 	-- Show in floating window
 	local diff_win = ui.create_diff_window(diff_buf)
+
+	-- Apply syntax highlighting
+	local ns_id = vim.api.nvim_create_namespace("ailite_diff")
+	for _, hl in ipairs(highlights) do
+		if hl.type == "delete" then
+			vim.api.nvim_buf_add_highlight(diff_buf, ns_id, "DiffDelete", hl.line - 1, 0, -1)
+		elseif hl.type == "add" then
+			vim.api.nvim_buf_add_highlight(diff_buf, ns_id, "DiffAdd", hl.line - 1, 0, -1)
+		elseif hl.type == "hunk" then
+			vim.api.nvim_buf_add_highlight(diff_buf, ns_id, "DiffChange", hl.line - 1, 0, -1)
+		end
+	end
+
+	-- Make buffer non-modifiable
+	vim.api.nvim_buf_set_option(diff_buf, "modifiable", false)
 
 	-- Keymaps for diff
 	local opts = { noremap = true, silent = true, buffer = diff_buf }
@@ -273,15 +330,14 @@ function M.apply_code_with_diff()
 	-- Confirm replacement
 	vim.keymap.set("n", "y", function()
 		vim.api.nvim_win_close(diff_win, true)
-		-- Clear and replace in one operation
 		vim.api.nvim_buf_set_lines(state.plugin.original_buf, 0, -1, false, new_lines)
-		utils.notify("✅ File replaced", vim.log.levels.INFO)
+		utils.notify("✅ Changes applied successfully", vim.log.levels.INFO)
 	end, opts)
 
 	-- Cancel
 	vim.keymap.set("n", "n", function()
 		vim.api.nvim_win_close(diff_win, true)
-		utils.notify("❌ Replacement cancelled", vim.log.levels.INFO)
+		utils.notify("❌ Changes cancelled", vim.log.levels.INFO)
 	end, opts)
 
 	vim.keymap.set("n", "q", function()
@@ -291,13 +347,6 @@ function M.apply_code_with_diff()
 	vim.keymap.set("n", "<Esc>", function()
 		vim.api.nvim_win_close(diff_win, true)
 	end, opts)
-
-	-- Show instructions
-	vim.api.nvim_buf_set_lines(diff_buf, -1, -1, false, {
-		"",
-		"─────────────────────────────────────",
-		"Press 'y' to confirm, 'n' to cancel",
-	})
 end
 
 return M
