@@ -20,6 +20,8 @@ M.plugin = {
 	input_start_line = nil,
 	is_in_input_mode = false,
 	current_input_lines = {},
+	last_prompt_was_sent = false,
+	unsent_prompt = nil,
 }
 
 -- State for streaming context
@@ -47,6 +49,8 @@ function M.reset_plugin()
 		input_start_line = nil,
 		is_in_input_mode = false,
 		current_input_lines = {},
+		last_prompt_was_sent = false,
+		unsent_prompt = nil,
 	}
 end
 
