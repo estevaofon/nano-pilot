@@ -95,10 +95,9 @@ clean:
 	@rm -f luacov.report.out
 
 # Run CI tests
-# Run all tests in the tests directory
 test-ci: check-deps
 	@echo "Running CI tests..."
-	@$(BUSTED) --output=TAP --tap-file=tests.tap --no-summary --no-path --no-colors tests
+	@$(BUSTED) --output=TAP --pattern=ci
 
 # Show help
 help:

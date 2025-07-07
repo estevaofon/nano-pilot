@@ -30,4 +30,4 @@ jobs:
         luarocks install luacov-console
     
     - name: Run tests
-      run: cd tests && make test-ci
+      run: cd tests && make test
