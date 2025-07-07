@@ -48,10 +48,8 @@ deps:
 
 # Run all tests
 test: check-deps
-	@echo "Adding spec.test_helper.lua to package.path..."
-	@export LUA_PATH="$(shell pwd)/tests/spec.test_helper.lua;;$(LUA_PATH)"
 	@echo "Running tests with busted..."
-	@cd .. && $(BUSTED) tests
+	@cd .. && $(BUSTED) tests --lpath="../lua/?.lua;../lua/?/init.lua;./?.lua"
 
 # Alternative: run tests from tests directory
 test-here:
