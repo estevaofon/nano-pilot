@@ -1,0 +1,18 @@
+-- .busted para Windows
+-- Salvar em: D:\OneDrive\Documentos\nvim_projects\ailite.nvim\tests\.busted
+
+return {
+	_all = {
+		coverage = false,
+		-- Adicionar o caminho do projeto ao package.path
+		lpath = "../lua/?.lua;../lua/?/init.lua;lua/?.lua;lua/?/init.lua",
+		cpath = "../lua/?.dll;../lua/?/?.dll",
+		pattern = "spec",
+		ROOT = { "." },
+		verbose = true,
+	},
+	default = {
+		output = "plainTerminal",
+		suffix = "_spec.lua",
+	},
+}
