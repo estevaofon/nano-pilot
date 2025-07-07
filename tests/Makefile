@@ -49,7 +49,7 @@ deps:
 # Run all tests
 test: check-deps
 	@echo "Running tests with busted..."
-	@cd .. && $(BUSTED) tests --lpath="../lua/?.lua;../lua/?/init.lua;./?.lua"
+	@cd .. && LUA_PATH="./tests/?.lua;./tests/?/init.lua;$$LUA_PATH" $(BUSTED) tests
 
 # Alternative: run tests from tests directory
 test-here:
