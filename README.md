@@ -87,7 +87,8 @@ require("ailite").setup({
   
   -- Interface Configuration
   chat_input_prefix = ">>> ",
-  assistant_prefix = "Claude: ",
+  assistant_prefix = "Ailite: ",
+  assistant_name = "AiLite",
   user_prefix = "You: ",
   
   -- Keybindings
