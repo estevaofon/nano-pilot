@@ -17,11 +17,29 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Cache Lua installation
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/luarocks
+          /opt/hostedtoolcache/lua
+        key: ${{ runner.os }}-lua-${{ matrix.lua-version }}
+        restore-keys: |
+          ${{ runner.os }}-lua-
+    
     - uses: leafo/gh-actions-lua@v10
       with:
         luaVersion: ${{ matrix.lua-version }}
     
     - uses: leafo/gh-actions-luarocks@v4
+    
+    - name: Cache LuaRocks packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.luarocks
+        key: ${{ runner.os }}-luarocks-${{ hashFiles('**/rockspec') }}
+        restore-keys: |
+          ${{ runner.os }}-luarocks-
     
     - name: Install dependencies
       run: |

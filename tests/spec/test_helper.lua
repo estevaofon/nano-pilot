@@ -128,6 +128,8 @@ M.mock_fs = {
 local original_io_open = io.open
 M.setup_fs_mock = function()
     io.open = function(path, mode)
+        -- Only mock files that we've explicitly set in our mock filesystem
+        -- This prevents interfering with luarocks and other system files
         if mode == "r" then
             local content = M.mock_fs.files[path]
             if content then
@@ -137,14 +139,18 @@ M.setup_fs_mock = function()
                 }
             end
         elseif mode == "w" then
-            return {
-                write = function(_, content)
-                    M.mock_fs.files[path] = content
-                end,
-                close = function() end
-            }
+            -- Only mock write operations for our test files and temp files
+            if M.mock_fs.files[path] ~= nil or path:match("^/test/") or path:match("^/tmp/") then
+                return {
+                    write = function(_, content)
+                        M.mock_fs.files[path] = content
+                    end,
+                    close = function() end
+                }
+            end
         end
-        return nil
+        -- Fall back to original io.open for all other files
+        return original_io_open(path, mode)
     end
 end
 
