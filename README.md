@@ -220,6 +220,74 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Powered by [Anthropic's Claude API](https://www.anthropic.com/)
 - Built with ❤️ for the Neovim community
 
+## 🧪 Testing
+
+### Running Unit Tests
+
+The project includes comprehensive unit tests to ensure code quality and reliability.
+
+#### Prerequisites
+
+First, install LuaRocks if not already installed:
+```bash
+# Ubuntu/Debian
+sudo apt-get install luarocks
+
+# macOS
+brew install luarocks
+
+# Arch Linux
+sudo pacman -S luarocks
+```
+
+Then install test dependencies:
+```bash
+# Install test dependencies with luarocks
+luarocks install --local busted
+luarocks install --local luacov
+luarocks install --local luacov-console
+
+# Add to PATH if needed
+export PATH="$HOME/.luarocks/bin:$PATH"
+
+# Or use the provided Makefile
+cd tests
+make deps
+```
+
+#### Running Tests
+```bash
+# Run all tests
+cd tests
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Run tests in watch mode
+make test-watch
+
+# Run specific test file
+make test-file FILE=spec/ailite/config_spec.lua
+```
+
+#### Alternative: Simple Test Runner
+If you don't have `busted` installed:
+```bash
+# Run tests without dependencies
+cd tests
+make test-simple
+```
+
+#### Available Test Commands
+- `make deps` - Install test dependencies (busted, luacov)
+- `make test` - Run all tests with busted
+- `make test-simple` - Run tests with simple runner (no dependencies)
+- `make test-coverage` - Run tests with coverage report
+- `make test-watch` - Run tests in watch mode
+- `make check-deps` - Check if test dependencies are installed
+- `make clean` - Clean test artifacts
+
 ## 🐛 Troubleshooting
 
 ### API Key Issues
