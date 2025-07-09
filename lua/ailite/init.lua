@@ -222,7 +222,7 @@ function M.prompt_with_selection()
 
 	-- Create prompt with selection context
 	local prompt = string.format(
-		"About the selected code:\n```%s\n%s\n```\n\nWhat would you like to do with this code?",
+		"About the selected code:\n```%s\n%s\n```\n\nIn the next prompt I will ask you what to do with this code.\n\n",
 		vim.bo.filetype,
 		selection
 	)
